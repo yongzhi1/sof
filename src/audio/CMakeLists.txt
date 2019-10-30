@@ -57,7 +57,7 @@ if(NOT CONFIG_LIBRARY)
 	endif()
 	if(CONFIG_COMP_TEST_KEYPHRASE)
 		add_local_sources(sof
-			detect_test.c
+			google_hotword_detect.c
 		)
 	endif()
 	if(CONFIG_COMP_TEST_SMART_AMP)
