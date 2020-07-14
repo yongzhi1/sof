@@ -175,12 +175,18 @@ install(
 add_library(sof_ld_flags INTERFACE)
 add_library(sof_ld_scripts INTERFACE)
 
+target_include_directories(sof_public_headers INTERFACE ${PROJECT_SOURCE_DIR}/third_party_libraries)
+link_directories(${PROJECT_SOURCE_DIR}/third_party_libraries)
+
 # declare target with no sources to let cmake know about it
 add_executable(sof "")
 target_link_libraries(sof PRIVATE sof_options)
 target_link_libraries(sof PRIVATE sof_ld_scripts)
 target_link_libraries(sof PRIVATE sof_ld_flags)
 target_link_libraries(sof PRIVATE sof_static_libraries)
+target_link_libraries(sof PRIVATE libhifi3_google_hotword_dsp_api.a)
+target_link_libraries(sof PRIVATE c)
+target_link_libraries(sof PRIVATE m)
 
 sof_add_build_counter_rule()
 
