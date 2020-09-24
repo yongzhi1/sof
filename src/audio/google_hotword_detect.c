@@ -40,7 +40,7 @@ static const struct comp_driver ghw_driver;
 DECLARE_SOF_RT_UUID("kd-test", keyword_uuid, 0xeba8d51f, 0x7827, 0x47b5,
 		    0x82, 0xee, 0xde, 0x6e, 0x77, 0x43, 0xaf, 0x67);
 
-DECLARE_TR_CTX(keyword_tr, SOF_UUID(keyword_uuid), LOG_LEVEL_INFO);
+DECLARE_TR_CTX(keyword_tr, SOF_UUID(keyword_uuid), LOG_LEVEL_DEBUG);
 
 struct ghw_private {
 	struct comp_model_data model;
@@ -260,8 +260,13 @@ static void ghw_detect(struct comp_dev *dev, const void *samples,
 	ret = GoogleHotwordDspProcess(samples, num_samples,
 				      &preamble_length_ms);
 	if (ret == 1) {
-		comp_info(dev, "Hotword detected %dms", preamble_length_ms);
+		comp_info(dev, "-------- Hotword detected %dms ---------",
+			  preamble_length_ms);
 		priv->detected = 1;
+
+		if (preamble_length_ms > KPB_MAX_DRAINING_REQ)
+			preamble_length_ms = KPB_MAX_DRAINING_REQ;
+
 		priv->client_data.drain_req = preamble_length_ms;
 		notify_host(dev);
 		notify_kpb(dev);
@@ -280,6 +285,9 @@ static int ghw_copy(struct comp_dev *dev)
 	source = list_first_item(&dev->bsource_list,
 				 struct comp_buffer, sink_list);
 	stream = &source->stream;
+
+	if (!stream->avail)
+		return PPL_STATUS_PATH_STOP;
 
 	buffer_lock(source, &flags);
 	frames = audio_stream_get_avail_frames(&source->stream);
