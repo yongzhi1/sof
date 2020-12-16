@@ -1189,6 +1189,8 @@ static void pipeline_schedule_cancel(struct pipeline *p)
 		sa_set_panic_on_delay(true);
 }
 
+struct perf_cnt_data perf_cnt = {0};
+
 static enum task_state pipeline_task(void *arg)
 {
 	struct pipeline *p = arg;
@@ -1205,6 +1207,7 @@ static enum task_state pipeline_task(void *arg)
 			return SOF_TASK_STATE_COMPLETED;
 	}
 
+	perf_tic(&perf_cnt);
 	err = pipeline_copy(p);
 	if (err < 0) {
 		/* try to recover */
@@ -1216,6 +1219,7 @@ static enum task_state pipeline_task(void *arg)
 		}
 	}
 
+	perf_toc(&perf_cnt, p);
 	pipe_dbg(p, "pipeline_task() sched");
 
 	return SOF_TASK_STATE_RESCHEDULE;
