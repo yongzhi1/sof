@@ -49,6 +49,7 @@ define(`SMART_SSP_NAME', concat(concat(`SSP', AMP_SSP),`-Codec'))
 define(`SMART_BE_ID', 7)
 #define SSP mclk
 define(`SSP_MCLK', 24576000)
+
 # Playback related
 define(`SMART_PB_PPL_ID', 1)
 define(`SMART_PB_CH_NUM', 2)
@@ -134,6 +135,18 @@ PIPELINE_PCM_ADD(sof/pipe-volume-playback.m4,
 	1000, 0, 0,
 	48000, 48000, 48000)
 
+# BT offload
+PIPELINE_PCM_ADD(sof/pipe-passthrough-playback.m4,
+	eval(SMART_REF_PPL_ID + 1), 50, 1, s16le,
+	1000, 0, 0,
+	8000, 16000, 48000)
+
+# BT offload
+PIPELINE_PCM_ADD(sof/pipe-passthrough-capture.m4,
+	eval(SMART_REF_PPL_ID + 2), 50, 1, s16le,
+	1000, 0, 0,
+	8000, 16000, 48000)
+
 #
 # DAIs configuration
 #
@@ -185,6 +198,20 @@ DAI_ADD(sof/pipe-dai-playback.m4,
 	PIPELINE_SOURCE_8, 2, s32le,
 	1000, 0, 0, SCHEDULE_TIME_DOMAIN_TIMER)
 
+# playback DAI is SSP2 using 2 periods
+# Buffers use s16le format, with 48 frame per 1000us on core 0 with priority 0
+DAI_ADD(sof/pipe-dai-playback.m4,
+	eval(SMART_REF_PPL_ID + 1), SSP, 2, SSP2-Codec,
+	PIPELINE_SOURCE_12, 1, s16le,
+	1000, 0, 0, SCHEDULE_TIME_DOMAIN_TIMER)
+
+# capture DAI is SSP2 using 2 periods
+# Buffers use s16le format, with 48 frame per 1000us on core 0 with priority 0
+DAI_ADD(sof/pipe-dai-capture.m4,
+	eval(SMART_REF_PPL_ID + 2), SSP, 2, SSP2-Codec,
+	PIPELINE_SINK_13, 1, s16le,
+	1000, 0, 0, SCHEDULE_TIME_DOMAIN_TIMER)
+
 #
 # Bind PCM with the pipeline
 #
@@ -194,6 +221,7 @@ PCM_PLAYBACK_ADD(HDMI1, 2, PIPELINE_PCM_5)
 PCM_PLAYBACK_ADD(HDMI2, 3, PIPELINE_PCM_6)
 PCM_PLAYBACK_ADD(HDMI3, 4, PIPELINE_PCM_7)
 PCM_PLAYBACK_ADD(HDMI4, 5, PIPELINE_PCM_8)
+PCM_DUPLEX_ADD(BTSCO, 50, PIPELINE_PCM_12, PIPELINE_PCM_13)
 
 #
 # BE configurations - overrides config in ACPI if present
@@ -212,6 +240,25 @@ DAI_CONFIG(SSP, 0, 0, SSP0-Codec,
                       SSP_CLOCK(fsync, 48000, codec_slave),
                       SSP_TDM(2, 32, 3, 3),
                       SSP_CONFIG_DATA(SSP, 0, 32)))
+
+# BT offload on SSP2
+
+define(`hwconfig_names', HW_CONFIG_NAMES(LIST(`     ', "hw_config1", "hw_config2")))
+define(`data_names', DAI_DATA_NAMES(LIST(`     ', "ssp_data1", "ssp_data2")))
+
+define(`ssp_config_list_1', LIST(`',
+	`MULTI_SSP_CONFIG(hw_config1, 8, DSP_A, SSP_CLOCK(mclk, SSP_MCLK, codec_mclk_in),'
+		`SSP_CLOCK(bclk, 128000, codec_master, inverted),'
+		`SSP_CLOCK(fsync, 8000, codec_master),'
+		`SSP_TDM(1, 16, 1, 1),'
+		`SSP_MULTI_CONFIG_DATA(ssp_data1, 16))',
+	`MULTI_SSP_CONFIG(hw_config2, 9, DSP_A, SSP_CLOCK(mclk, SSP_MCLK, codec_mclk_in),'
+		`SSP_CLOCK(bclk, 256000, codec_master, inverted),'
+		`SSP_CLOCK(fsync, 16000, codec_master),'
+		`SSP_TDM(1, 16, 1, 1),'
+		`SSP_MULTI_CONFIG_DATA(ssp_data2, 16))'))
+
+MULTI_DAI_CONFIG(SSP, 2, eval(SMART_BE_ID + 1), SSP2-Codec, ssp_config_list_1, hwconfig_names, data_names)
 
 # 4 HDMI/DP outputs (ID: 3,4,5,6)
 DAI_CONFIG(HDA, 0, 3, iDisp1,
