@@ -19,6 +19,8 @@ include(`sof/tokens.m4')
 include(`platform/intel/tgl.m4')
 include(`platform/intel/dmic.m4')
 
+define(LAST_PIPELINE_ID, `8')
+
 DEBUG_START
 
 #
@@ -96,6 +98,21 @@ PIPELINE_PCM_ADD(sof/pipe-volume-playback.m4,
         1000, 0, 0,
         48000, 48000, 48000)
 
+# BT audio offload
+define(`CHANNELS_MIN', 1)
+
+PIPELINE_PCM_ADD(sof/pipe-passthrough-playback.m4,
+	eval(LAST_PIPELINE_ID + 1), 50, 2, s16le,
+	1000, 0, 0,
+	8000, 16000, 48000)
+
+PIPELINE_PCM_ADD(sof/pipe-passthrough-capture.m4,
+	eval(LAST_PIPELINE_ID + 2), 50, 2, s16le,
+	1000, 0, 0,
+	8000, 16000, 48000)
+
+undefine(`CHANNELS_MIN')
+
 #
 # DAIs configuration
 #
@@ -160,6 +177,17 @@ DAI_ADD(sof/pipe-dai-playback.m4,
         PIPELINE_SOURCE_8, 3, s32le,
         1000, 0, 0, SCHEDULE_TIME_DOMAIN_TIMER)
 
+# BT offload
+DAI_ADD(sof/pipe-dai-playback.m4,
+	eval(LAST_PIPELINE_ID + 1), SSP, 2, SSP2-NoCodec,
+	PIPELINE_SOURCE_9, 2, s16le,
+	1000, 0, 0, SCHEDULE_TIME_DOMAIN_TIMER)
+
+DAI_ADD(sof/pipe-dai-capture.m4,
+	eval(LAST_PIPELINE_ID + 2), SSP, 2, SSP2-NoCodec,
+	PIPELINE_SINK_10, 2, s16le,
+	1000, 0, 0, SCHEDULE_TIME_DOMAIN_TIMER)
+
 # PCM Low Latency, id 0
 dnl PCM_PLAYBACK_ADD(name, pcm_id, playback)
 PCM_PLAYBACK_ADD(SDW0-speakers, 0, PIPELINE_PCM_1)
@@ -170,6 +198,7 @@ PCM_PLAYBACK_ADD(HDMI1, 4, PIPELINE_PCM_5)
 PCM_PLAYBACK_ADD(HDMI2, 5, PIPELINE_PCM_6)
 PCM_PLAYBACK_ADD(HDMI3, 6, PIPELINE_PCM_7)
 PCM_PLAYBACK_ADD(HDMI4, 7, PIPELINE_PCM_8)
+PCM_DUPLEX_ADD(BT-PCM, 50, PIPELINE_PCM_9, PIPELINE_PCM_10)
 
 #
 # BE configurations - overrides config in ACPI if present
@@ -184,19 +213,19 @@ DAI_CONFIG(ALH, 2, 0, SDW0-Playback,
 DAI_CONFIG(ALH, 3, 1, SDW0-Capture,
 	ALH_CONFIG(ALH_CONFIG_DATA(ALH, 3, 48000, 2)))
 
-# dmic01 (ID: 1)
+# dmic01 (ID: 2)
 DAI_CONFIG(DMIC, 0, 2, dmic01,
 	   DMIC_CONFIG(1, 500000, 4800000, 40, 60, 48000,
 		DMIC_WORD_LENGTH(s32le), 400, DMIC, 0,
 		PDM_CONFIG(DMIC, 0, FOUR_CH_PDM0_PDM1)))
 
-# dmic16k (ID: 2)
+# dmic16k (ID: 3)
 DAI_CONFIG(DMIC, 1, 3, dmic16k,
 	   DMIC_CONFIG(1, 500000, 4800000, 40, 60, 16000,
 		DMIC_WORD_LENGTH(s16le), 400, DMIC, 1,
 		PDM_CONFIG(DMIC, 1, STEREO_PDM0)))
 
-# 3 HDMI/DP outputs (ID: 4,5,6)
+# 3 HDMI/DP outputs (ID: 4,5,6,7)
 DAI_CONFIG(HDA, 0, 4, iDisp1,
         HDA_CONFIG(HDA_CONFIG_DATA(HDA, 0, 48000, 2)))
 DAI_CONFIG(HDA, 1, 5, iDisp2,
@@ -205,5 +234,31 @@ DAI_CONFIG(HDA, 2, 6, iDisp3,
         HDA_CONFIG(HDA_CONFIG_DATA(HDA, 2, 48000, 2)))
 DAI_CONFIG(HDA, 3, 7, iDisp4,
         HDA_CONFIG(HDA_CONFIG_DATA(HDA, 3, 48000, 2)))
+
+# BT offload on SSP2 (ID: 8)
+include(`ssp.m4')
+define(`SSP_MCLK', 19200000)
+
+define(`hwconfig_names', HW_CONFIG_NAMES(LIST(`     ', "hw_config1", "hw_config2", "hw_config3")))
+define(`data_names', DAI_DATA_NAMES(LIST(`     ', "ssp_data1", "ssp_data2", "ssp_data3")))
+
+define(`ssp_config_list_1', LIST(`',
+	`MULTI_SSP_CONFIG(hw_config1, 8, DSP_A, SSP_CLOCK(mclk, SSP_MCLK, codec_mclk_in),'
+		`SSP_CLOCK(bclk, 128000, codec_master, inverted),'
+		`SSP_CLOCK(fsync, 8000, codec_master),'
+		`SSP_TDM(1, 16, 1, 1),'
+		`SSP_MULTI_CONFIG_DATA(ssp_data1, 16))',
+	`MULTI_SSP_CONFIG(hw_config2, 9, DSP_A, SSP_CLOCK(mclk, SSP_MCLK, codec_mclk_in),'
+		`SSP_CLOCK(bclk, 256000, codec_master, inverted),'
+		`SSP_CLOCK(fsync, 16000, codec_master),'
+		`SSP_TDM(1, 16, 1, 1),'
+		`SSP_MULTI_CONFIG_DATA(ssp_data2, 16))',
+	`MULTI_SSP_CONFIG(hw_config3, 10, DSP_A, SSP_CLOCK(mclk, eval(SSP_MCLK * 2), codec_mclk_in),'
+		`SSP_CLOCK(bclk, 1536000, codec_master),'
+		`SSP_CLOCK(fsync, 48000, codec_master),'
+		`SSP_TDM(2, 16, 3, 3),'
+		`SSP_MULTI_CONFIG_DATA(ssp_data3, 16))'))
+
+MULTI_DAI_CONFIG(SSP, 2, 8, SSP2-NoCodec, ssp_config_list_1, hwconfig_names, data_names)
 
 DEBUG_END
