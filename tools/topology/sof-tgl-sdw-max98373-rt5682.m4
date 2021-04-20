@@ -40,7 +40,7 @@ DEBUG_START
 # PCM9 ----> volume -----> iDisp4
 # PCM10 <---- volume <---- DMIC01  (dmic 48k capture)
 # PCM12 <---- kpb <---- DMIC16k  (dmic 16k capture)
-
+# PCM13 <---> passthrough <---> SSP2 (Bluetooth)
 
 define(`SDW', 1)
 
@@ -142,6 +142,15 @@ PIPELINE_PCM_ADD(sof/pipe-volume-playback.m4,
 	9, 8, 2, s32le,
 	1000, 0, 0,
 	48000, 48000, 48000)
+
+# BT offload
+define(`BT_PIPELINE_PB_ID', eval(DMIC_PIPELINE_KWD_ID + 1))
+define(`BT_PIPELINE_CP_ID', eval(DMIC_PIPELINE_KWD_ID + 2))
+define(`BT_DAI_LINK_ID', 10)
+define(`BT_PCM_ID', 9)
+define(`HW_CONFIG_ID', `10')
+
+include(`platform/intel/intel-generic-bt.m4')
 
 #
 # DAIs configuration
