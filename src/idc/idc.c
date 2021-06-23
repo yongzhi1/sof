@@ -109,8 +109,12 @@ int idc_wait_in_blocking_mode(uint32_t target_core, bool (*cond)(int))
 	if (cond(target_core))
 		return 0;
 
-	tr_err(&idc_tr, "idc_wait_in_blocking_mode() error: timeout");
-	return -ETIME;
+	tr_err(&idc_tr, "idc_wait_in_blocking_mode() error: timeout target_core %u", target_core);
+
+	if (!target_core)
+		return -ETIME;
+
+	return 0;
 }
 
 /**
